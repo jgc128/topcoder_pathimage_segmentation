@@ -554,6 +554,7 @@ paket-files/
 # tools/**
 # !tools/packages.config
 
+.cache/
 
 # data dir
 data/
