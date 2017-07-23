@@ -7,7 +7,7 @@ from utils.io import load_image
 
 
 class PathologicalImagesDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, transform=None, image_transform=None, mask_transform=None):
         super(PathologicalImagesDataset, self).__init__()
 
         self.images_dir = data_dir.joinpath('images/')
@@ -22,6 +22,8 @@ class PathologicalImagesDataset(torch.utils.data.Dataset):
             self.masks = None
 
         self.transform = transform
+        self.image_transform = image_transform
+        self.mask_transform = mask_transform
 
     def __getitem__(self, index):
         image_filename = self.images[index]
@@ -35,6 +37,12 @@ class PathologicalImagesDataset(torch.utils.data.Dataset):
 
         if self.transform is not None:
             image, mask = self.transform(image, mask)
+
+        if self.image_transform is not None:
+            image = self.image_transform(image)
+
+        if self.mask_transform is not None:
+            mask = self.mask_transform(mask)
 
         return image, mask
 
