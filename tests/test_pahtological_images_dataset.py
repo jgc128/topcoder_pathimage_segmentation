@@ -2,7 +2,7 @@ import numpy as np
 
 import config
 
-from utils.torch.pathological_images_dataset import PathologicalImagesDataset
+from utils.torch.datasets import PathologicalImagesDataset
 
 
 def test_len():

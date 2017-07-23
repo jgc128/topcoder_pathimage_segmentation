@@ -17,25 +17,34 @@ import config
 from config import MODELS_DIR
 from models.fcn import FCN32
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
-from utils.torch.pathological_images_dataset import PathologicalImagesDataset, PathologicalImagesDatasetMode
+from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 from utils.torch.transforms import MaskToTensor, ImageMaskTransformsCompose, SamplePatch, RandomTranspose, \
     RandomVerticalFlip, RandomHorizontalFlip, CopyNumpy
 
 ex = Experiment()
 
 
-def create_data_loader(mode, patch_size, batch_size, shuffle):
-    transform = [
-        SamplePatch(patch_size),
-        RandomTranspose(),
-        RandomVerticalFlip(),
-        RandomHorizontalFlip(),
-        CopyNumpy(),
-    ]
+def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=True):
+    transform = []
+
+    if patch_size != 0:
+        transform.append(SamplePatch(patch_size))
+
+    if augment:
+        transform.extend([
+            RandomTranspose(),
+            RandomVerticalFlip(),
+            RandomHorizontalFlip(),
+            CopyNumpy(),
+        ])
+
     transform = ImageMaskTransformsCompose(transform)
 
     image_transform = [
         torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(
+            mean=[0.70500564, 0.4902217, 0.6467339], std=[0.19247672, 0.20918619, 0.15601342]
+        ),
     ]
     image_transform = torchvision.transforms.Compose(image_transform)
 
@@ -130,8 +139,10 @@ def main(patch_size, regularization, learning_rate, batch_size, nb_epochs):
 
     model = FCN32(nb_classes=1)
 
-    data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, patch_size, batch_size, shuffle=True)
-    data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, patch_size, batch_size, shuffle=True)
+    data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, batch_size=batch_size,
+                                           patch_size=patch_size, augment=True, shuffle=True)
+    data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, batch_size=batch_size,
+                                         patch_size=patch_size, augment=True, shuffle=True)
 
     checkpoint_filename = str(MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
     train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, regularization,
