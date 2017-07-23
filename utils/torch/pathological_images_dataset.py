@@ -1,19 +1,43 @@
+import logging
+from enum import Enum
+
 import numpy as np
 import cv2
 import torch
 import torch.utils.data
 
+from sklearn.model_selection import train_test_split
+
 from utils.io import load_image
 
 
+class PathologicalImagesDatasetMode(Enum):
+    Train = 1
+    Val = 2
+    All = 3
+
+
 class PathologicalImagesDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, transform=None, image_transform=None, mask_transform=None):
+    def __init__(self, data_dir, mode=PathologicalImagesDatasetMode.Train,
+                 transform=None, image_transform=None, mask_transform=None):
         super(PathologicalImagesDataset, self).__init__()
+
+        self.mode = mode
 
         self.images_dir = data_dir.joinpath('images/')
         self.truth_dir = data_dir.joinpath('truth/')
 
-        self.images = sorted(self.images_dir.iterdir())
+        images = sorted(self.images_dir.iterdir())
+
+        if self.mode == PathologicalImagesDatasetMode.All:
+            self.images = images
+        else:
+            images_train, images_val = train_test_split(images, test_size=0.2, random_state=42)
+            if self.mode == PathologicalImagesDatasetMode.Train:
+                self.images = images_train
+            else:
+                self.images = images_val
+
         self.nb_images = len(self.images)
 
         if self.truth_dir.exists():
@@ -24,6 +48,8 @@ class PathologicalImagesDataset(torch.utils.data.Dataset):
         self.transform = transform
         self.image_transform = image_transform
         self.mask_transform = mask_transform
+
+        logging.info(f'Data: {self.mode} - {len(self.images)} images')
 
     def __getitem__(self, index):
         image_filename = self.images[index]
