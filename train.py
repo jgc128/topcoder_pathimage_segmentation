@@ -1,7 +1,6 @@
 import os
 import logging
 
-
 import numpy as np
 
 from tqdm import tqdm
@@ -15,7 +14,8 @@ import torchvision.transforms
 import config
 from models.fcn import FCN32
 from utils.torch.pathological_images_dataset import PathologicalImagesDataset
-from utils.torch.transforms import MaskToTensor, ImageMaskTransformsCompose, Resize
+from utils.torch.transforms import MaskToTensor, ImageMaskTransformsCompose, SamplePatch, RandomTranspose, \
+    RandomVerticalFlip, RandomHorizontalFlip, CopyNumpy
 
 
 def maybe_to_cuda(obj):
@@ -26,8 +26,13 @@ def maybe_to_cuda(obj):
 
 
 def main():
+    patch_size = 224
     transform = [
-        Resize(480),
+        SamplePatch(patch_size),
+        RandomTranspose(),
+        RandomVerticalFlip(),
+        RandomHorizontalFlip(),
+        CopyNumpy(),
     ]
     transform = ImageMaskTransformsCompose(transform)
 
@@ -41,8 +46,10 @@ def main():
     ]
     mask_transform = torchvision.transforms.Compose(mask_transform)
 
-    data_set = PathologicalImagesDataset(config.DATASET_TRAIN_DIR, transform=transform, image_transform=image_transform,
-                                         mask_transform=mask_transform)
+    data_set = PathologicalImagesDataset(
+        config.DATASET_TRAIN_DIR,
+        transform=transform, image_transform=image_transform, mask_transform=mask_transform
+    )
 
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=8, shuffle=True, num_workers=1,
                                               pin_memory=torch.cuda.is_available())
@@ -65,7 +72,8 @@ def main():
                 model.train(False)
 
             running_loss_bce = 0.0
-            for j, (images, masks) in tqdm(enumerate(data_loader, 1), total=len(data_loader), desc=f'Epoch {epoch} {phase}'):
+            for j, (images, masks) in tqdm(enumerate(data_loader, 1), total=len(data_loader),
+                                           desc=f'Epoch {epoch} {phase}'):
                 images = torch.autograd.Variable(maybe_to_cuda(images))
                 masks = torch.autograd.Variable(maybe_to_cuda(masks))
 

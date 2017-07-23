@@ -73,13 +73,53 @@ class Resize(BaseImageMaskTransformer):
         return image
 
 
+class CopyNumpy(BaseImageMaskTransformer):
+    def __init__(self):
+        super(CopyNumpy, self).__init__()
+
+        self.apply_always = True
+
+    def transform(self, image, mode):
+        return np.copy(image)
+
+
+class SamplePatch(BaseImageMaskTransformer):
+    def __init__(self, patch_size):
+        super(SamplePatch, self).__init__()
+
+        self.patch_size = patch_size
+
+        self.apply_always = True
+
+        self._patch_coordinate_h = 0
+        self._patch_coordinate_w = 0
+
+    def transform(self, image, mode):
+        # sample coordinates to apply to both image and mask
+        if mode == ImageMaskTransformMode.Image:
+            image_height = image.shape[0]
+            image_width = image.shape[1]
+
+            max_height = image_height - self.patch_size
+            max_width = image_width - self.patch_size
+
+            self._patch_coordinate_h = np.random.randint(0, max_height)
+            self._patch_coordinate_w = np.random.randint(0, max_width)
+
+        c_h = (self._patch_coordinate_h, self._patch_coordinate_h + self.patch_size)
+        c_w = (self._patch_coordinate_w, self._patch_coordinate_w + self.patch_size)
+        image = image[c_h[0]:c_h[1], c_w[0]:c_w[1]]
+
+        return image
+
+
 class ImageMaskTransformsCompose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
     def __call__(self, image, mask):
-        for t in self.transforms:
-            image, mask = t(image, mask)
+        for transform_step in self.transforms:
+            image, mask = transform_step(image, mask)
 
         return image, mask
 
