@@ -19,6 +19,7 @@ from models.fcn import FCN32
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
+from utils.torch.losses import DiceWithLogitsLoss
 
 ex = Experiment()
 
@@ -74,7 +75,8 @@ def train_model(model, data_loader_train, data_loader_val,
         'val': data_loader_val,
     }
 
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn_bce = torch.nn.BCEWithLogitsLoss()
+    loss_fn_dice = DiceWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=regularization)
 
     model = maybe_to_cuda(model)
@@ -90,7 +92,10 @@ def train_model(model, data_loader_train, data_loader_val,
             else:
                 model.train(False)
 
+            # TODO: optimize losses
             running_loss_bce = 0.0
+            running_loss_dice = 0.0
+            running_loss_total = 0.0
             for j, (images, masks) in enumerate(data_loaders[phase], 1):
                 images = torch.autograd.Variable(maybe_to_cuda(images))
                 masks = torch.autograd.Variable(maybe_to_cuda(masks))
@@ -102,28 +107,39 @@ def train_model(model, data_loader_train, data_loader_val,
                 outputs = model(images)
                 outputs = outputs.squeeze()
 
-                loss_bce = loss_fn(outputs, masks)
+                loss_bce = loss_fn_bce(outputs, masks)
+                loss_dice = loss_fn_dice(outputs, masks)
+                loss_total = loss_bce - torch.log(loss_dice)
 
                 if phase == 'train':
-                    loss_bce.backward()
+                    loss_total.backward()
                     optimizer.step()
 
                 running_loss_bce += loss_bce.data[0]
+                running_loss_dice += loss_dice.data[0]
+                running_loss_total += loss_total.data[0]
 
                 del loss_bce
+                del loss_dice
+                del loss_total
                 del outputs
 
             epoch_loss_bce = running_loss_bce / j
+            epoch_loss_dice = running_loss_dice / j
+            epoch_loss_total = running_loss_total / j
 
-            model_saved_str = ''
+            log_str = f'Epoch {epoch} {phase}, loss: ' \
+                      f'bce {epoch_loss_bce:.3f}, dice {epoch_loss_dice:.3f}, total {epoch_loss_total:.3f}'
+
             if phase == 'val' and epoch_loss_bce < loss_best:
                 torch.save(model.state_dict(), checkpoint_filename)
                 loss_best = epoch_loss_bce
 
-                model_saved_str = '[model saved]'
+                log_str += ' [model saved]'
 
-            logging.info(f'Epoch {epoch} {phase}, loss: {epoch_loss_bce:.5f} {model_saved_str}')
-            append_log_file('training.log', f'{epoch}\t{phase}\t{epoch_loss_bce:.5f}')
+            logging.info(log_str)
+            append_log_file('training.log',
+                            f'{epoch}\t{phase}\t{epoch_loss_bce:.3f}\t{epoch_loss_dice:.3f}\t{epoch_loss_total:.3f}')
 
 
 def append_log_file(filename, log_string):
@@ -136,7 +152,7 @@ def append_log_file(filename, log_string):
 def cfg():
     patch_size = 224
 
-    regularization = 0.00001
+    regularization = 0.000001
 
     learning_rate = 0.001
     batch_size = 40
