@@ -12,6 +12,7 @@ from torch.autograd import Variable
 import torchvision.transforms
 
 from sacred import Experiment
+from tqdm import tqdm
 
 import config
 from models.fcn import FCN32
@@ -122,6 +123,13 @@ def train_model(model, data_loader_train, data_loader_val,
                 model_saved_str = '[model saved]'
 
             logging.info(f'Epoch {epoch} {phase}, loss: {epoch_loss_bce:.5f} {model_saved_str}')
+            append_log_file('training.log', f'{epoch}\t{phase}\t{epoch_loss_bce:.5f}')
+
+
+def append_log_file(filename, log_string):
+    with open(filename, 'a') as f:
+        f.write(log_string)
+        f.write('\n')
 
 
 @ex.config

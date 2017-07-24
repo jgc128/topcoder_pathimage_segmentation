@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import torchvision.transforms
 
 from sacred import Experiment
+from tqdm import tqdm
 
 import config
 from config import MODELS_DIR
@@ -30,6 +31,7 @@ def predict(model, data_loader):
     model.train(False)
 
     predictions = []
+    tq = tqdm(desc='Prediction', total=len(data_loader.dataset))
     for j, (images, _) in enumerate(data_loader, 1):
         images = torch.autograd.Variable(maybe_to_cuda(images))
 
@@ -38,6 +40,7 @@ def predict(model, data_loader):
         batch_predictions = F.sigmoid(batch_predictions)
 
         predictions.append(batch_predictions.data.cpu().numpy())
+        tq.update(len(images))
 
     predictions = np.concatenate(predictions)
 
