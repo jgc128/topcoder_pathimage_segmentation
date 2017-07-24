@@ -3,8 +3,10 @@ from enum import Enum
 
 import numpy as np
 import cv2
+from imgaug import augmenters as iaa
 
 import torch
+from imgaug.parameters import Deterministic
 
 
 class ImageMaskTransformMode(Enum):
@@ -109,6 +111,79 @@ class SamplePatch(BaseImageMaskTransformer):
         c_h = (self._patch_coordinate_h, self._patch_coordinate_h + self.patch_size)
         c_w = (self._patch_coordinate_w, self._patch_coordinate_w + self.patch_size)
         image = image[c_h[0]:c_h[1], c_w[0]:c_w[1]]
+
+        return image
+
+
+class Add(BaseImageMaskTransformer):
+    def __init__(self, from_val=-10, to_val=10, per_channel=0.5):
+        super(Add, self).__init__()
+
+        self.from_val = from_val
+        self.to_val = to_val
+        self.per_channel = per_channel
+
+        self.augmentor = iaa.Add((self.from_val, self.to_val), per_channel=self.per_channel)
+
+    def transform(self, image, mode):
+        if mode == ImageMaskTransformMode.Image:
+            image = self.augmentor.augment_image(image)
+
+        return image
+
+
+class ContrastNormalization(BaseImageMaskTransformer):
+    def __init__(self, from_val=0.8, to_val=1.2, per_channel=0.5):
+        super(ContrastNormalization, self).__init__()
+
+        self.from_val = from_val
+        self.to_val = to_val
+        self.per_channel = per_channel
+
+        self.augmentor = iaa.ContrastNormalization((self.from_val, self.to_val), per_channel=self.per_channel)
+
+    def transform(self, image, mode):
+        if mode == ImageMaskTransformMode.Image:
+            image = self.augmentor.augment_image(image)
+
+        return image
+
+
+class Rotate(BaseImageMaskTransformer):
+    def __init__(self, from_val=-20, to_val=20, mode='reflect'):
+        super(Rotate, self).__init__()
+
+        self.from_val = from_val
+        self.to_val = to_val
+        self.mode = mode
+
+        self.augmentor = iaa.Affine(rotate=0, mode=self.mode)
+
+    def transform(self, image, mode):
+        # sample angle
+        if mode == ImageMaskTransformMode.Image:
+            angle = np.random.randint(self.from_val, self.to_val)
+            self.augmentor.rotate = Deterministic(angle)
+
+        image = self.augmentor.augment_image(image)
+
+        return image
+
+
+class Rotate90n(BaseImageMaskTransformer):
+    def __init__(self):
+        super(Rotate90n, self).__init__()
+
+        self._angles = [0, 90, 180, 270]
+        self.augmentor = iaa.Affine(rotate=0)
+
+    def transform(self, image, mode):
+        # sample angle
+        if mode == ImageMaskTransformMode.Image:
+            angle = np.random.choice(self._angles)
+            self.augmentor.rotate = Deterministic(angle)
+
+        image = self.augmentor.augment_image(image)
 
         return image
 

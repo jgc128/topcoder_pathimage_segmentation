@@ -98,7 +98,7 @@ class DeterministicPatchesDataset(PathologicalImagesDataset):
 
         # generate patches for all images
         patches_coordinates = self._get_patches_coordinates(self.image_height, self.image_width, self.patch_size,
-                                                            overlap=0.5)
+                                                            overlap=0.2)
 
         self.patches = [
             (image_idx, patch)

@@ -32,7 +32,7 @@ def create_submission_files(submission_dir, images, predictions):
 def cfg():
     model_class = 'FCN32'
     patch_size_train = 224
-    patch_size_predict = 480
+    patch_size_predict = 224
 
 
 @ex.main
@@ -52,7 +52,6 @@ def main(model_class, patch_size_train, patch_size_predict):
     create_submission_files(submission_dir, images_train, predictions_train)
 
     # create archive
-
     submission_filename = shutil.make_archive(submission_dir, 'zip', submission_dir)
     logging.info(f'Archive created: {submission_filename}')
 

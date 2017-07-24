@@ -14,12 +14,10 @@ import torchvision.transforms
 from sacred import Experiment
 
 import config
-from config import MODELS_DIR
 from models.fcn import FCN32
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
-from utils.torch.transforms import MaskToTensor, ImageMaskTransformsCompose, SamplePatch, RandomTranspose, \
-    RandomVerticalFlip, RandomHorizontalFlip, CopyNumpy
+import utils.torch.transforms
 
 ex = Experiment()
 
@@ -28,17 +26,21 @@ def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=
     transform = []
 
     if patch_size != 0:
-        transform.append(SamplePatch(patch_size))
+        transform.append(utils.torch.transforms.SamplePatch(patch_size))
 
     if augment:
         transform.extend([
-            RandomTranspose(),
-            RandomVerticalFlip(),
-            RandomHorizontalFlip(),
-            CopyNumpy(),
+            utils.torch.transforms.RandomTranspose(),
+            utils.torch.transforms.RandomVerticalFlip(),
+            utils.torch.transforms.RandomHorizontalFlip(),
+            utils.torch.transforms.Add(-50, 50, per_channel=False),
+            utils.torch.transforms.ContrastNormalization(0.5, 1.5, per_channel=False),
+            utils.torch.transforms.Rotate90n(),
+            utils.torch.transforms.Rotate(-30, 30, mode='reflect'),
+            utils.torch.transforms.CopyNumpy(),
         ])
 
-    transform = ImageMaskTransformsCompose(transform)
+    transform = utils.torch.transforms.ImageMaskTransformsCompose(transform)
 
     image_transform = [
         torchvision.transforms.ToTensor(),
@@ -49,7 +51,7 @@ def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=
     image_transform = torchvision.transforms.Compose(image_transform)
 
     mask_transform = [
-        MaskToTensor()
+        utils.torch.transforms.MaskToTensor()
     ]
     mask_transform = torchvision.transforms.Compose(mask_transform)
 
@@ -144,7 +146,7 @@ def main(patch_size, regularization, learning_rate, batch_size, nb_epochs):
     data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, batch_size=batch_size,
                                          patch_size=patch_size, augment=True, shuffle=True)
 
-    checkpoint_filename = str(MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
+    checkpoint_filename = str(config.MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
     train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, regularization,
                 checkpoint_filename)
 

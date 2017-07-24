@@ -113,8 +113,8 @@ def predict_and_save(model, base_dir, mode, predictions_filename, batch_size, pa
 @ex.config
 def cfg():
     patch_size_train = 224
-    patch_size_predict = 480
-    batch_size = 6
+    patch_size_predict = 224
+    batch_size = 30
 
 
 @ex.main
