@@ -12,6 +12,7 @@ from torch.autograd import Variable
 import torchvision.transforms
 
 from sacred import Experiment
+from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
 import config
@@ -77,7 +78,9 @@ def train_model(model, data_loader_train, data_loader_val,
 
     loss_fn_bce = torch.nn.BCEWithLogitsLoss()
     loss_fn_dice = DiceWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), weight_decay=regularization)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularization)
+    lr_scheduler = MultiStepLR(optimizer, milestones=[100, 200, 300], gamma=0.1)
 
     model = maybe_to_cuda(model)
 
@@ -91,6 +94,9 @@ def train_model(model, data_loader_train, data_loader_val,
                 model.train(True)
             else:
                 model.train(False)
+
+            if phase == 'train':
+                lr_scheduler.step()
 
             # TODO: optimize losses
             running_loss_bce = 0.0
@@ -131,9 +137,9 @@ def train_model(model, data_loader_train, data_loader_val,
             log_str = f'Epoch {epoch} {phase}, loss: ' \
                       f'bce {epoch_loss_bce:.3f}, dice {epoch_loss_dice:.3f}, total {epoch_loss_total:.3f}'
 
-            if phase == 'val' and epoch_loss_bce < loss_best:
+            if phase == 'val' and epoch_loss_total < loss_best:
                 torch.save(model.state_dict(), checkpoint_filename)
-                loss_best = epoch_loss_bce
+                loss_best = epoch_loss_total
 
                 log_str += ' [model saved]'
 
