@@ -36,8 +36,8 @@ def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=
             utils.torch.transforms.RandomTranspose(),
             utils.torch.transforms.RandomVerticalFlip(),
             utils.torch.transforms.RandomHorizontalFlip(),
-            utils.torch.transforms.Add(-50, 50, per_channel=False),
-            utils.torch.transforms.ContrastNormalization(0.5, 1.5, per_channel=False),
+            # utils.torch.transforms.Add(-50, 50, per_channel=False),
+            # utils.torch.transforms.ContrastNormalization(0.5, 1.5, per_channel=False),
             utils.torch.transforms.Rotate90n(),
             utils.torch.transforms.Rotate(-30, 30, mode='reflect'),
             utils.torch.transforms.CopyNumpy(),
@@ -80,7 +80,7 @@ def train_model(model, data_loader_train, data_loader_val,
     loss_fn_dice = DiceWithLogitsLoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularization)
-    lr_scheduler = MultiStepLR(optimizer, milestones=[100, 200, 300], gamma=0.1)
+    lr_scheduler = MultiStepLR(optimizer, milestones=[200, 500, 700], gamma=0.1)
 
     model = maybe_to_cuda(model)
 
@@ -116,7 +116,7 @@ def train_model(model, data_loader_train, data_loader_val,
                 loss_bce = loss_fn_bce(outputs, masks)
                 loss_dice = loss_fn_dice(outputs, masks)
                 if use_dice:
-                    loss_total = loss_bce - torch.log(loss_dice)
+                    loss_total = loss_bce + loss_dice
                 else:
                     loss_total = loss_bce
 
@@ -182,7 +182,7 @@ def cfg():
     batch_size = 50
     nb_epochs = 50
 
-    use_dice = False
+    use_dice = True
 
 
 @ex.main

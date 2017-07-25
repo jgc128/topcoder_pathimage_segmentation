@@ -16,6 +16,8 @@ class DiceWithLogitsLoss(torch.nn.Module):
         denominator = inputs.sum() + targets.sum() + epsilon
         numerator = 2 * torch.sum(inputs * targets) + epsilon
 
-        loss = numerator / denominator
+        dice = numerator / denominator
+
+        loss = 1 - dice
 
         return loss
