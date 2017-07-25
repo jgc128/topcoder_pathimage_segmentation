@@ -17,6 +17,7 @@ from tqdm import tqdm
 import config
 from config import MODELS_DIR
 from models.fcn import FCN32
+from train import create_model
 from utils.io import save_pickle
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda, restore_weights
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode, DeterministicPatchesDataset
@@ -115,16 +116,21 @@ def predict_and_save(model, base_dir, mode, predictions_filename, batch_size, pa
 
 @ex.config
 def cfg():
+    model_name = 'unet'
     patch_size_train = 224
     patch_size_predict = 224
     batch_size = 30
 
 
 @ex.main
-def main(patch_size_train, patch_size_predict, batch_size):
+def main(model_name, patch_size_train, patch_size_predict, batch_size):
     set_variable_repr()
 
-    model = FCN32(nb_classes=1)
+    model_params = {
+        'in_channels': 3,
+        'out_channels': 1,
+    }
+    model = create_model(model_name, model_params)
     logging.info('Model created')
 
     checkpoint_filename = str(MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size_train}.ckpt'))

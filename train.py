@@ -70,7 +70,7 @@ def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=
 
 
 def train_model(model, data_loader_train, data_loader_val,
-                learning_rate, nb_epochs, batch_size, regularization, checkpoint_filename):
+                learning_rate, nb_epochs, batch_size, use_dice, regularization, checkpoint_filename):
     data_loaders = {
         'train': data_loader_train,
         'val': data_loader_val,
@@ -115,7 +115,10 @@ def train_model(model, data_loader_train, data_loader_val,
 
                 loss_bce = loss_fn_bce(outputs, masks)
                 loss_dice = loss_fn_dice(outputs, masks)
-                loss_total = loss_bce - torch.log(loss_dice)
+                if use_dice:
+                    loss_total = loss_bce - torch.log(loss_dice)
+                else:
+                    loss_total = loss_bce
 
                 if phase == 'train':
                     loss_total.backward()
@@ -134,8 +137,8 @@ def train_model(model, data_loader_train, data_loader_val,
             epoch_loss_dice = running_loss_dice / j
             epoch_loss_total = running_loss_total / j
 
-            log_str = f'Epoch {epoch} {phase}, loss: ' \
-                      f'bce {epoch_loss_bce:.3f}, dice {epoch_loss_dice:.3f}, total {epoch_loss_total:.3f}'
+            log_str = f'Epoch {epoch} {phase}, ' \
+                      f'bce: {epoch_loss_bce:.3f}, dice: {epoch_loss_dice:.3f}, total: {epoch_loss_total:.3f}'
 
             if phase == 'val' and epoch_loss_total < loss_best:
                 torch.save(model.state_dict(), checkpoint_filename)
@@ -176,12 +179,14 @@ def cfg():
     regularization = 0.000001
 
     learning_rate = 0.001
-    batch_size = 2
+    batch_size = 50
     nb_epochs = 50
+
+    use_dice = False
 
 
 @ex.main
-def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_epochs):
+def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_epochs, use_dice):
     set_variable_repr()
 
     model_params = {
@@ -196,7 +201,8 @@ def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_e
                                          patch_size=patch_size, augment=True, shuffle=True)
 
     checkpoint_filename = str(config.MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
-    train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, regularization,
+    train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, use_dice,
+                regularization,
                 checkpoint_filename)
 
 
