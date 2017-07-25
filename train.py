@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
 import config
-from models.fcn import FCN32
+from models import FCN32, UNet
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
@@ -148,6 +148,19 @@ def train_model(model, data_loader_train, data_loader_val,
                             f'{epoch}\t{phase}\t{epoch_loss_bce:.3f}\t{epoch_loss_dice:.3f}\t{epoch_loss_total:.3f}')
 
 
+def create_model(model_name, model_params):
+    if model_name == 'fcn':
+        model_class = FCN32
+    elif model_name == 'unet':
+        model_class = UNet
+    else:
+        raise ValueError(f'Unknown model {model_name}')
+
+    model = model_class(**model_params)
+
+    return model
+
+
 def append_log_file(filename, log_string):
     with open(filename, 'a') as f:
         f.write(log_string)
@@ -156,20 +169,26 @@ def append_log_file(filename, log_string):
 
 @ex.config
 def cfg():
+    model_name = 'unet'
+
     patch_size = 224
 
     regularization = 0.000001
 
     learning_rate = 0.001
-    batch_size = 40
+    batch_size = 2
     nb_epochs = 50
 
 
 @ex.main
-def main(patch_size, regularization, learning_rate, batch_size, nb_epochs):
+def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_epochs):
     set_variable_repr()
 
-    model = FCN32(nb_classes=1)
+    model_params = {
+        'in_channels': 3,
+        'out_channels': 1,
+    }
+    model = create_model(model_name, model_params)
 
     data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, batch_size=batch_size,
                                            patch_size=patch_size, augment=True, shuffle=True)

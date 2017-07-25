@@ -52,10 +52,13 @@ class VGGBlock(torch.nn.Module):
 class FCN32(torch.nn.Module):
     """With help of https://github.com/wkentaro/pytorch-fcn/blob/master/torchfcn/models/fcn32s.py"""
 
-    def __init__(self, nb_classes):
+    def __init__(self, in_channels, out_channels):
         super(FCN32, self).__init__()
 
-        self.conv1 = VGGBlock(in_channels=3, out_channels=64, nb_convs=2)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.conv1 = VGGBlock(in_channels=self.in_channels, out_channels=64, nb_convs=2)
         self.conv2 = VGGBlock(in_channels=64, out_channels=128, nb_convs=2)
         self.conv3 = VGGBlock(in_channels=128, out_channels=256, nb_convs=3)
         self.conv4 = VGGBlock(in_channels=256, out_channels=512, nb_convs=3)
@@ -83,7 +86,7 @@ class FCN32(torch.nn.Module):
 
         self.conv8 = VGGBlock(in_channels=32, out_channels=32, nb_convs=2, pool=False)
 
-        self.logits = torch.nn.Conv2d(32, nb_classes, 1, padding=0)
+        self.logits = torch.nn.Conv2d(32, self.out_channels, 1, padding=0)
 
         self._init_weights()
 
@@ -93,14 +96,14 @@ class FCN32(torch.nn.Module):
                 torch.nn.init.xavier_normal(m.weight.data)
                 # m.bias.data.zero_()
 
-            # if isinstance(m, torch.nn.BatchNorm2d):
-            #     m.weight.data.fill_(1)
-            #     m.bias.data.zero_()
+                # if isinstance(m, torch.nn.BatchNorm2d):
+                #     m.weight.data.fill_(1)
+                #     m.bias.data.zero_()
 
-            # if isinstance(m, torch.nn.ConvTranspose2d):
-            #     assert m.kernel_size[0] == m.kernel_size[1]
-            #     initial_weight = get_upsampling_weight(m.in_channels, m.out_channels, m.kernel_size[0])
-            #     m.weight.data.copy_(initial_weight)
+                # if isinstance(m, torch.nn.ConvTranspose2d):
+                #     assert m.kernel_size[0] == m.kernel_size[1]
+                #     initial_weight = get_upsampling_weight(m.in_channels, m.out_channels, m.kernel_size[0])
+                #     m.weight.data.copy_(initial_weight)
 
         logging.info('Weights initialized')
 
