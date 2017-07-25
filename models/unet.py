@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict
 
 import torch
@@ -94,6 +95,25 @@ class UNet(torch.nn.Module):
             self.up.append(UNetModule(f_in, f_out))
 
         self.logits = torch.nn.Conv2d(self.up_filter_sizes[-1], self.out_channels, 1, padding=0)
+
+        self._init_weights()
+
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, torch.nn.Conv2d):
+                torch.nn.init.xavier_normal(m.weight.data)
+                m.bias.data.zero_()
+
+                # if isinstance(m, torch.nn.BatchNorm2d):
+                #     m.weight.data.fill_(1)
+                #     m.bias.data.zero_()
+
+                # if isinstance(m, torch.nn.ConvTranspose2d):
+                #     assert m.kernel_size[0] == m.kernel_size[1]
+                #     initial_weight = get_upsampling_weight(m.in_channels, m.out_channels, m.kernel_size[0])
+                #     m.weight.data.copy_(initial_weight)
+
+        logging.info('Weights initialized')
 
     def forward(self, inputs):
         net = inputs
