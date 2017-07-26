@@ -60,7 +60,7 @@ class UpSampleModule(torch.nn.Module):
 
 class UNet(torch.nn.Module):
     def __init__(self, in_channels, out_channels,
-                 filter_base=32, filter_factors=(1, 2, 4, 8, 16), filter_bottom=1024):
+                 filter_base=16, filter_factors=(1, 2, 4, 8, 16), filter_bottom=1024):
         super(UNet, self).__init__()
 
         self.in_channels = in_channels

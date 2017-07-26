@@ -22,6 +22,9 @@ def dice_score(y_true, y_pred):
 
 
 def topcoder_metric(y_true, y_pred):
+    if y_true.max() > 1:
+        y_true = y_true / 255
+
     f1 = f1_micro_score(y_true, y_pred)
     d = dice_score(y_true, y_pred)
     score = 1000000.0 * (f1 + d) / 2.0

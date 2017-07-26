@@ -174,7 +174,7 @@ def append_log_file(filename, log_string):
 def cfg():
     model_name = 'unet'
 
-    patch_size = 224
+    patch_size = 480
 
     regularization = 0.000001
 
@@ -182,7 +182,7 @@ def cfg():
     batch_size = 50
     nb_epochs = 50
 
-    use_dice = True
+    use_dice = False
 
 
 @ex.main
