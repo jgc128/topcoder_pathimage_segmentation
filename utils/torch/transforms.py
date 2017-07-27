@@ -188,6 +188,23 @@ class Rotate90n(BaseImageMaskTransformer):
         return image
 
 
+class MakeBorder(BaseImageMaskTransformer):
+    def __init__(self, border_size):
+        super(MakeBorder, self).__init__()
+
+        self.border_size = border_size
+
+        self.apply_always = True
+
+    def transform(self, image, mode):
+        # sample angle
+        if mode == ImageMaskTransformMode.Image:
+            image = cv2.copyMakeBorder(image, self.border_size, self.border_size, self.border_size, self.border_size,
+                                       cv2.BORDER_REFLECT)
+
+        return image
+
+
 class ImageMaskTransformsCompose(object):
     def __init__(self, transforms):
         self.transforms = transforms

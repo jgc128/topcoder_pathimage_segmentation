@@ -20,16 +20,21 @@ from models import FCN32, UNet
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
+from utils.torch.layers import CenterCrop2d
 from utils.torch.losses import DiceWithLogitsLoss
+from utils.torch.transforms import MakeBorder
 
 ex = Experiment()
 
 
-def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=True):
+def create_data_loader(mode, batch_size=32, patch_size=0, make_border=0, augment=True, shuffle=True):
     transform = []
 
     if patch_size != 0:
         transform.append(utils.torch.transforms.SamplePatch(patch_size))
+
+    if make_border != 0:
+        transform.append(MakeBorder(border_size=make_border))
 
     if augment:
         transform.extend([
@@ -70,7 +75,7 @@ def create_data_loader(mode, batch_size=32, patch_size=0, augment=True, shuffle=
 
 
 def train_model(model, data_loader_train, data_loader_val,
-                learning_rate, nb_epochs, batch_size, use_dice, regularization, checkpoint_filename):
+                learning_rate, nb_epochs, batch_size, make_border, use_dice, regularization, checkpoint_filename):
     data_loaders = {
         'train': data_loader_train,
         'val': data_loader_val,
@@ -87,6 +92,10 @@ def train_model(model, data_loader_train, data_loader_val,
     j = 1
     loss_best = np.inf
     iteration = 0
+
+    crop_outputs = None
+    if make_border != 0:
+        crop_outputs = CenterCrop2d(make_border)
 
     for epoch in range(nb_epochs):
         for phase in ['train', 'val']:
@@ -112,6 +121,9 @@ def train_model(model, data_loader_train, data_loader_val,
                 # forward + backward + optimize
                 outputs = model(images)
                 outputs = outputs.squeeze()
+
+                if crop_outputs is not None:
+                    outputs = crop_outputs(outputs)
 
                 loss_bce = loss_fn_bce(outputs, masks)
                 loss_dice = loss_fn_dice(outputs, masks)
@@ -174,19 +186,20 @@ def append_log_file(filename, log_string):
 def cfg():
     model_name = 'unet'
 
-    patch_size = 480
+    patch_size = 0
+    make_border = 6
 
     regularization = 0.000001
 
     learning_rate = 0.001
-    batch_size = 50
+    batch_size = 6
     nb_epochs = 50
 
     use_dice = False
 
 
 @ex.main
-def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_epochs, use_dice):
+def main(model_name, patch_size, make_border, regularization, learning_rate, batch_size, nb_epochs, use_dice):
     set_variable_repr()
 
     model_params = {
@@ -196,14 +209,13 @@ def main(model_name, patch_size, regularization, learning_rate, batch_size, nb_e
     model = create_model(model_name, model_params)
 
     data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, batch_size=batch_size,
-                                           patch_size=patch_size, augment=True, shuffle=True)
+                                           patch_size=patch_size, make_border=make_border, augment=True, shuffle=True)
     data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, batch_size=batch_size,
-                                         patch_size=patch_size, augment=True, shuffle=True)
+                                         patch_size=patch_size, make_border=make_border, augment=True, shuffle=True)
 
     checkpoint_filename = str(config.MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
-    train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, use_dice,
-                regularization,
-                checkpoint_filename)
+    train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border,
+                use_dice, regularization, checkpoint_filename)
 
 
 if __name__ == '__main__':
