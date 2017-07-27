@@ -27,7 +27,8 @@ from utils.torch.transforms import MakeBorder
 ex = Experiment()
 
 
-def create_data_loader(mode, batch_size=32, patch_size=0, make_border=0, augment=True, shuffle=True):
+def create_data_loader(mode, nb_folds=5, fold_number=0, batch_size=32, patch_size=0, make_border=0,
+                       augment=True, shuffle=True):
     transform = []
 
     if patch_size != 0:
@@ -64,7 +65,7 @@ def create_data_loader(mode, batch_size=32, patch_size=0, make_border=0, augment
     mask_transform = torchvision.transforms.Compose(mask_transform)
 
     data_set = PathologicalImagesDataset(
-        config.DATASET_TRAIN_DIR, mode=mode,
+        config.DATASET_TRAIN_DIR, mode=mode, nb_folds=nb_folds, fold_number=fold_number,
         transform=transform, image_transform=image_transform, mask_transform=mask_transform
     )
 
@@ -74,8 +75,8 @@ def create_data_loader(mode, batch_size=32, patch_size=0, make_border=0, augment
     return data_loader
 
 
-def train_model(model, data_loader_train, data_loader_val,
-                learning_rate, nb_epochs, batch_size, make_border, use_dice, regularization, checkpoint_filename):
+def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border, use_dice,
+                regularization, checkpoint_filename):
     data_loaders = {
         'train': data_loader_train,
         'val': data_loader_val,
@@ -85,7 +86,7 @@ def train_model(model, data_loader_train, data_loader_val,
     loss_fn_dice = DiceWithLogitsLoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularization)
-    lr_scheduler = MultiStepLR(optimizer, milestones=[200, 500, 700], gamma=0.1)
+    lr_scheduler = MultiStepLR(optimizer, milestones=[200, 400, 600], gamma=0.1)
 
     model = maybe_to_cuda(model)
 
@@ -182,6 +183,11 @@ def append_log_file(filename, log_string):
         f.write('\n')
 
 
+def get_checkpoint_filename(model_name, patch_size, fold_number):
+    checkpoint_filename = config.MODELS_DIR.joinpath(f'{model_name}_patch{patch_size}_fold{fold_number}.ckpt')
+    return checkpoint_filename
+
+
 @ex.config
 def cfg():
     model_name = 'unet'
@@ -189,17 +195,20 @@ def cfg():
     patch_size = 0
     make_border = 6
 
-    regularization = 0.000001
+    nb_folds = 5
+    fold_number = 0
 
+    regularization = 0.000001
     learning_rate = 0.001
     batch_size = 6
-    nb_epochs = 50
+    nb_epochs = 800
 
     use_dice = False
 
 
 @ex.main
-def main(model_name, patch_size, make_border, regularization, learning_rate, batch_size, nb_epochs, use_dice):
+def main(model_name, patch_size, make_border, nb_folds, fold_number, regularization, learning_rate,
+         batch_size, nb_epochs, use_dice):
     set_variable_repr()
 
     model_params = {
@@ -208,12 +217,14 @@ def main(model_name, patch_size, make_border, regularization, learning_rate, bat
     }
     model = create_model(model_name, model_params)
 
-    data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, batch_size=batch_size,
-                                           patch_size=patch_size, make_border=make_border, augment=True, shuffle=True)
-    data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, batch_size=batch_size,
-                                         patch_size=patch_size, make_border=make_border, augment=True, shuffle=True)
+    data_loader_train = create_data_loader(PathologicalImagesDatasetMode.Train, nb_folds=nb_folds,
+                                           fold_number=fold_number, batch_size=batch_size, patch_size=patch_size,
+                                           make_border=make_border, augment=True, shuffle=True)
+    data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, nb_folds=nb_folds, fold_number=fold_number,
+                                         batch_size=batch_size, patch_size=patch_size, make_border=make_border,
+                                         augment=True, shuffle=True)
 
-    checkpoint_filename = str(config.MODELS_DIR.joinpath(f'{type(model).__name__}_{patch_size}.ckpt'))
+    checkpoint_filename = str(get_checkpoint_filename(model_name, patch_size, fold_number))
     train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border,
                 use_dice, regularization, checkpoint_filename)
 

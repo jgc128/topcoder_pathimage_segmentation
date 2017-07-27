@@ -4,7 +4,7 @@ from enum import Enum
 import numpy as np
 import torch.utils.data
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 
 from utils.io import load_image
 
@@ -16,21 +16,30 @@ class PathologicalImagesDatasetMode(Enum):
 
 
 class PathologicalImagesDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir, mode=PathologicalImagesDatasetMode.Train,
+    def __init__(self, data_dir, mode=PathologicalImagesDatasetMode.Train, fold_number=0, nb_folds=5,
                  transform=None, image_transform=None, mask_transform=None):
         super(PathologicalImagesDataset, self).__init__()
 
         self.mode = mode
+        self.fold_number = fold_number
 
         self.images_dir = data_dir.joinpath('images/')
         self.truth_dir = data_dir.joinpath('truth/')
 
-        images = sorted(self.images_dir.iterdir())
+        images = np.array(sorted(self.images_dir.iterdir()))
 
         if self.mode == PathologicalImagesDatasetMode.All:
             self.images = images
         else:
-            images_train, images_val = train_test_split(images, test_size=0.2, random_state=42)
+            idx_all = np.arange(len(images))
+
+            kf = KFold(n_splits=nb_folds, shuffle=True, random_state=42)
+            folds = [(idx_train, idx_val) for idx_train, idx_val in kf.split(idx_all)]
+            target_fold = folds[fold_number]
+
+            idx_train, idx_val = target_fold[0], target_fold[1]
+
+            images_train, images_val = images[idx_train], images[idx_val]
             if self.mode == PathologicalImagesDatasetMode.Train:
                 self.images = images_train
             else:
@@ -47,7 +56,7 @@ class PathologicalImagesDataset(torch.utils.data.Dataset):
         self.image_transform = image_transform
         self.mask_transform = mask_transform
 
-        logging.info(f'Data: {self.mode} - {self.nb_images} images')
+        logging.info(f'Data: {self.mode}, fold {self.fold_number} - {self.nb_images} images')
 
     def _load_image_and_mask(self, index):
         image_filename = self.images[index]
