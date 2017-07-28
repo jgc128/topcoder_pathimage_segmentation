@@ -22,7 +22,6 @@ from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDa
 import utils.torch.transforms
 from utils.torch.layers import CenterCrop2d
 from utils.torch.losses import DiceWithLogitsLoss
-from utils.torch.transforms import MakeBorder
 
 ex = Experiment()
 
@@ -35,7 +34,7 @@ def create_data_loader(mode, nb_folds=5, fold_number=0, batch_size=32, patch_siz
         transform.append(utils.torch.transforms.SamplePatch(patch_size))
 
     if make_border != 0:
-        transform.append(MakeBorder(border_size=make_border))
+        transform.append(utils.torch.transforms.MakeBorder(border_size=make_border))
 
     if augment:
         transform.extend([
@@ -202,6 +201,7 @@ def cfg():
     learning_rate = 0.001
     batch_size = 6
     nb_epochs = 800
+
 
     use_dice = False
 

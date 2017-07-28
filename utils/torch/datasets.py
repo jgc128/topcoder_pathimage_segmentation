@@ -106,8 +106,11 @@ class DeterministicPatchesDataset(PathologicalImagesDataset):
         self.image_width = 500
 
         # generate patches for all images
-        patches_coordinates = self._get_patches_coordinates(self.image_height, self.image_width, self.patch_size,
-                                                            overlap=0.5)
+        if self.patch_size != 0:
+            patches_coordinates = self._get_patches_coordinates(self.image_height, self.image_width, self.patch_size,
+                                                                overlap=0.5)
+        else:
+            patches_coordinates = [(0, 0)]
 
         self.patches = [
             (image_idx, patch)
@@ -153,13 +156,14 @@ class DeterministicPatchesDataset(PathologicalImagesDataset):
 
         image, mask = self._load_image_and_mask(image_idx)
 
-        # get patch
-        c_h = (patch_info[1][0], patch_info[1][0] + self.patch_size)
-        c_w = (patch_info[1][1], patch_info[1][1] + self.patch_size)
+        if self.patch_size != 0:
+            # get patch
+            c_h = (patch_info[1][0], patch_info[1][0] + self.patch_size)
+            c_w = (patch_info[1][1], patch_info[1][1] + self.patch_size)
 
-        image = image[c_h[0]:c_h[1], c_w[0]:c_w[1]]
-        if isinstance(mask, np.ndarray):
-            mask = mask[c_h[0]:c_h[1], c_w[0]:c_w[1]]
+            image = image[c_h[0]:c_h[1], c_w[0]:c_w[1]]
+            if isinstance(mask, np.ndarray):
+                mask = mask[c_h[0]:c_h[1], c_w[0]:c_w[1]]
 
         image, mask = self._apply_transforms(image, mask)
 

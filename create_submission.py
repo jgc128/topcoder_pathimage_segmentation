@@ -8,9 +8,12 @@ import logging
 import numpy as np
 
 from sacred import Experiment
+from scipy.stats import gmean
 
 import config
+from predict import get_prediction_filename
 from utils.io import load_pickle
+from utils.torch.datasets import PathologicalImagesDatasetMode
 
 ex = Experiment()
 
@@ -28,27 +31,53 @@ def create_submission_files(submission_dir, images, predictions, threshold):
     logging.info(f'Submission files created: {submission_dir}, {len(images)}')
 
 
+def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold):
+    threshold = str(threshold).replace('.', '')
+    submission_dir_name = config.SUBMISSIONS_DIR.joinpath(
+        'folds/',
+        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_tr{threshold}'
+    )
+    return submission_dir_name
+
+
 @ex.config
 def cfg():
-    model_class = 'UNet'
-    patch_size_train = 480
-    patch_size_predict = 480
+    model_name = 'unet'
+    patch_size_train = 0
+    patch_size_predict = 0
+
+    nb_folds = 5
+
     threshold = 0.4
 
 
 @ex.main
-def main(model_class, patch_size_train, patch_size_predict, threshold):
-    submission_dir = config.SUBMISSIONS_DIR.joinpath(
-        f'{model_class}_{patch_size_train}_{patch_size_predict}_{threshold}'
-    )
+def main(model_name, patch_size_train, patch_size_predict, nb_folds, threshold):
+    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold)
 
-    filename_test = config.PREDICTIONS_DIR.joinpath(f'{model_class}_{patch_size_train}_{patch_size_predict}_test.pkl')
-    images_test, predictions_test = load_pickle(filename_test)
-    create_submission_files(submission_dir, images_test, predictions_test, threshold)
+    configurations = [
+        {'mode': PathologicalImagesDatasetMode.Val, 'base_dir': config.DATASET_TRAIN_DIR, },
+        {'mode': PathologicalImagesDatasetMode.Train, 'base_dir': config.DATASET_TRAIN_DIR, },
+        {'mode': PathologicalImagesDatasetMode.All, 'base_dir': config.DATASET_TEST_DIR, },
+    ]
+    for conf in configurations:
+        mode = conf['mode']
+        base_dir = conf['base_dir']
 
-    filename_train = config.PREDICTIONS_DIR.joinpath(f'{model_class}_{patch_size_train}_{patch_size_predict}_train.pkl')
-    images_train, predictions_train = load_pickle(filename_train)
-    create_submission_files(submission_dir, images_train, predictions_train, threshold)
+        predictions = defaultdict(list)
+
+        for fold_number in range(nb_folds):
+            predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number)
+            images, fold_predictions = load_pickle(predictions_filename)
+
+            for image, image_pred in zip(images, fold_predictions):
+                predictions[image].append(image_pred)
+
+        # get geometric mean of all folds
+        images = sorted(predictions.keys())
+        predictions = [gmean(predictions[image]) for image in images]
+
+        create_submission_files(submission_dir, images, predictions, threshold)
 
     # create archive
     submission_filename = shutil.make_archive(submission_dir, 'zip', submission_dir)

@@ -9,9 +9,15 @@ class CenterCrop2d(torch.nn.Module):
         self.size = size
 
     def forward(self, inputs):
-        if len(inputs.size()) == 4:
+        # TODO: optimize it
+        nb_dims = len(inputs.size())
+        if nb_dims == 4:
             inputs = inputs[:, :, self.size:-self.size, self.size:-self.size]
-        else:
+        elif nb_dims == 3:
             inputs = inputs[:, self.size:-self.size, self.size:-self.size]
+        elif nb_dims == 2:
+            inputs = inputs[self.size:-self.size, self.size:-self.size]
+        else:
+            raise ValueError(f'Unsupported number of dimensions: {nb_dims}')
 
         return inputs.contiguous()
