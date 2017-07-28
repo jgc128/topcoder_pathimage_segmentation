@@ -48,7 +48,7 @@ def cfg():
 
     nb_folds = 5
 
-    threshold = 0.4
+    threshold = 0.3
 
 
 @ex.main

@@ -48,7 +48,12 @@ def predict(model, data_loader, make_border):
 
         batch_predictions = F.sigmoid(batch_predictions)
 
-        predictions.append(batch_predictions.data.cpu().numpy())
+        batch_predictions = batch_predictions.data.cpu().numpy()
+
+        if len(batch_predictions.shape) == 2:
+            batch_predictions = np.expand_dims(batch_predictions, 0)
+
+        predictions.append(batch_predictions)
         tq.update(len(images))
 
     predictions = np.concatenate(predictions)
@@ -56,7 +61,8 @@ def predict(model, data_loader, make_border):
     return predictions
 
 
-def create_data_loader(mode, base_dir, batch_size=32, patch_size=224, make_border=0, augment=False):
+def create_data_loader(base_dir, mode, nb_folds=5, fold_number=0, batch_size=32, patch_size=224, make_border=0,
+                       augment=False):
     transform = []
 
     if make_border != 0:
@@ -78,7 +84,7 @@ def create_data_loader(mode, base_dir, batch_size=32, patch_size=224, make_borde
     mask_transform = torchvision.transforms.Compose(mask_transform)
 
     data_set = DeterministicPatchesDataset(
-        patch_size, base_dir, mode=mode,
+        patch_size, base_dir, mode=mode, nb_folds=nb_folds, fold_number=fold_number,
         transform=transform, image_transform=image_transform, mask_transform=mask_transform
     )
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=batch_size, shuffle=False, num_workers=1,
@@ -161,7 +167,8 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
         predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
                                                        fold_number)
 
-        data_loader = create_data_loader(mode=mode, base_dir=base_dir, batch_size=batch_size,
+        data_loader = create_data_loader(base_dir=base_dir, mode=mode, nb_folds=nb_folds, fold_number=fold_number,
+                                         batch_size=batch_size,
                                          patch_size=patch_size_predict, make_border=make_border, augment=False)
 
         patches_predictions = predict(model, data_loader, make_border=make_border)
