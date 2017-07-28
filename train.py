@@ -12,7 +12,7 @@ from torch.autograd import Variable
 import torchvision.transforms
 
 from sacred import Experiment
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, ReduceLROnPlateau
 from tqdm import tqdm
 
 import config
@@ -41,8 +41,8 @@ def create_data_loader(mode, nb_folds=5, fold_number=0, batch_size=32, patch_siz
             utils.torch.transforms.RandomTranspose(),
             utils.torch.transforms.RandomVerticalFlip(),
             utils.torch.transforms.RandomHorizontalFlip(),
-            # utils.torch.transforms.Add(-50, 50, per_channel=False),
-            # utils.torch.transforms.ContrastNormalization(0.5, 1.5, per_channel=False),
+            utils.torch.transforms.Add(-30, 30, per_channel=False),
+            utils.torch.transforms.ContrastNormalization(0.8, 1.2, per_channel=False),
             utils.torch.transforms.Rotate90n(),
             utils.torch.transforms.Rotate(-30, 30, mode='reflect'),
             utils.torch.transforms.CopyNumpy(),
@@ -75,7 +75,7 @@ def create_data_loader(mode, nb_folds=5, fold_number=0, batch_size=32, patch_siz
 
 
 def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border, use_dice,
-                regularization, checkpoint_filename):
+                regularization, checkpoint_filename, log_filename=None):
     data_loaders = {
         'train': data_loader_train,
         'val': data_loader_val,
@@ -85,7 +85,8 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
     loss_fn_dice = DiceWithLogitsLoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularization)
-    lr_scheduler = MultiStepLR(optimizer, milestones=[200, 400, 600], gamma=0.1)
+    # lr_scheduler = MultiStepLR(optimizer, milestones=[200, 400, 600], gamma=0.1)
+    lr_scheduler = ReduceLROnPlateau(optimizer, patience=100)
 
     model = maybe_to_cuda(model)
 
@@ -103,9 +104,6 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
                 model.train(True)
             else:
                 model.train(False)
-
-            if phase == 'train':
-                lr_scheduler.step()
 
             # TODO: optimize losses
             running_loss_bce = 0.0
@@ -128,7 +126,7 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
                 loss_bce = loss_fn_bce(outputs, masks)
                 loss_dice = loss_fn_dice(outputs, masks)
                 if use_dice:
-                    loss_total = loss_bce + loss_dice
+                    loss_total = loss_bce - torch.log(1 - loss_dice)
                 else:
                     loss_total = loss_bce
 
@@ -158,9 +156,14 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
 
                 log_str += ' [model saved]'
 
+            if phase == 'val':
+                lr_scheduler.step(epoch_loss_total)
+
             logging.info(log_str)
-            append_log_file('training.log',
-                            f'{epoch}\t{phase}\t{epoch_loss_bce:.3f}\t{epoch_loss_dice:.3f}\t{epoch_loss_total:.3f}')
+
+            if log_filename is not None:
+                append_log_file(log_filename,
+                                f'{epoch}\t{phase}\t{epoch_loss_bce:.3f}\t{epoch_loss_dice:.3f}\t{epoch_loss_total:.3f}')
 
 
 def create_model(model_name, model_params):
@@ -182,8 +185,11 @@ def append_log_file(filename, log_string):
         f.write('\n')
 
 
-def get_checkpoint_filename(model_name, patch_size, fold_number):
-    checkpoint_filename = config.MODELS_DIR.joinpath(f'{model_name}_patch{patch_size}_fold{fold_number}.ckpt')
+def get_checkpoint_filename(model_name, patch_size, fold_number, use_dice):
+    use_dice = int(use_dice)
+    checkpoint_filename = config.MODELS_DIR.joinpath(
+        f'{model_name}_patch{patch_size}_fold{fold_number}_dice{use_dice}.ckpt'
+    )
     return checkpoint_filename
 
 
@@ -202,8 +208,7 @@ def cfg():
     batch_size = 6
     nb_epochs = 800
 
-
-    use_dice = False
+    use_dice = True
 
 
 @ex.main
@@ -224,9 +229,10 @@ def main(model_name, patch_size, make_border, nb_folds, fold_number, regularizat
                                          batch_size=batch_size, patch_size=patch_size, make_border=make_border,
                                          augment=True, shuffle=True)
 
-    checkpoint_filename = str(get_checkpoint_filename(model_name, patch_size, fold_number))
+    checkpoint_filename = get_checkpoint_filename(model_name, patch_size, fold_number, use_dice)
+    log_filename = checkpoint_filename.stem + '_training.log'
     train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border,
-                use_dice, regularization, checkpoint_filename)
+                use_dice, regularization, str(checkpoint_filename), log_filename)
 
 
 if __name__ == '__main__':
