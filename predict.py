@@ -122,10 +122,11 @@ def save_predictions(filename, images, predictions):
     save_pickle(filename, to_save)
 
 
-def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number):
+def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number, use_dice):
+    use_dice = int(use_dice)
     prediction_filename = config.PREDICTIONS_DIR.joinpath(
         'folds/',
-        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_fold{fold_number}_{mode.name.lower()}.pkl'
+        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_fold{fold_number}_dice{use_dice}_{mode.name.lower()}.pkl'
     )
     return prediction_filename
 
@@ -139,11 +140,13 @@ def cfg():
     nb_folds = 5
     fold_number = 0
 
+    use_dice = False
+
     batch_size = 4
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds, fold_number, batch_size):
+def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds, fold_number, use_dice, batch_size):
     set_variable_repr()
 
     model_params = {
@@ -153,7 +156,7 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
     model = create_model(model_name, model_params)
     logging.info('Model created')
 
-    checkpoint_filename = str(get_checkpoint_filename(model_name, patch_size_train, fold_number))
+    checkpoint_filename = str(get_checkpoint_filename(model_name, patch_size_train, fold_number, use_dice))
     restore_weights(model, checkpoint_filename)
 
     configurations = [
@@ -165,7 +168,7 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
         mode = conf['mode']
         base_dir = conf['base_dir']
         predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
-                                                       fold_number)
+                                                       fold_number, use_dice)
 
         data_loader = create_data_loader(base_dir=base_dir, mode=mode, nb_folds=nb_folds, fold_number=fold_number,
                                          batch_size=batch_size,
@@ -181,22 +184,6 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
 
         save_predictions(predictions_filename, data_loader.dataset.images, predictions)
         logging.info(f'Predictions saved: {predictions_filename}')
-
-        # # predict on the whole train
-        # base_dir_train = config.DATASET_TRAIN_DIR
-        # mode_train = PathologicalImagesDatasetMode.All
-        # predictions_filename_train = config.PREDICTIONS_DIR.joinpath(
-        #     f'{type(model).__name__}_{patch_size_train}_{patch_size_predict}_train.pkl'
-        # )
-        # predict_and_save(model, base_dir_train, mode_train, predictions_filename_train, batch_size, patch_size_predict)
-        #
-        # # predict test
-        # base_dir_test = config.DATASET_TEST_DIR
-        # mode_test = PathologicalImagesDatasetMode.All
-        # predictions_filename_test = config.PREDICTIONS_DIR.joinpath(
-        #     f'{type(model).__name__}_{patch_size_train}_{patch_size_predict}_test.pkl'
-        # )
-        # predict_and_save(model, base_dir_test, mode_test, predictions_filename_test, batch_size, patch_size_predict)
 
 
 if __name__ == '__main__':

@@ -31,11 +31,13 @@ def create_submission_files(submission_dir, images, predictions, threshold):
     logging.info(f'Submission files created: {submission_dir}, {len(images)}')
 
 
-def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold):
+def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice):
+    use_dice = int(use_dice)
     threshold = str(threshold).replace('.', '')
+
     submission_dir_name = config.SUBMISSIONS_DIR.joinpath(
         'folds/',
-        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_tr{threshold}'
+        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_dice{use_dice}_tr{threshold}'
     )
     return submission_dir_name
 
@@ -47,13 +49,14 @@ def cfg():
     patch_size_predict = 0
 
     nb_folds = 5
+    use_dice = True
 
     threshold = 0.3
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, nb_folds, threshold):
-    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold)
+def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, threshold):
+    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice)
 
     configurations = [
         {'mode': PathologicalImagesDatasetMode.Val, 'base_dir': config.DATASET_TRAIN_DIR, },
@@ -67,7 +70,8 @@ def main(model_name, patch_size_train, patch_size_predict, nb_folds, threshold):
         predictions = defaultdict(list)
 
         for fold_number in range(nb_folds):
-            predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number)
+            predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
+                                                           fold_number, use_dice)
             images, fold_predictions = load_pickle(predictions_filename)
 
             for image, image_pred in zip(images, fold_predictions):
