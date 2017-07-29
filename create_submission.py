@@ -49,7 +49,7 @@ def cfg():
     patch_size_predict = 0
 
     nb_folds = 5
-    use_dice = True
+    use_dice = False
 
     threshold = 0.3
 

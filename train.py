@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import MultiStepLR, ReduceLROnPlateau
 from tqdm import tqdm
 
 import config
-from models import FCN32, UNet
+from models import FCN32, UNet, Tiramisu
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
@@ -171,6 +171,8 @@ def create_model(model_name, model_params):
         model_class = FCN32
     elif model_name == 'unet':
         model_class = UNet
+    elif model_name == 'tiramisu':
+        model_class = Tiramisu
     else:
         raise ValueError(f'Unknown model {model_name}')
 
@@ -195,7 +197,7 @@ def get_checkpoint_filename(model_name, patch_size, fold_number, use_dice):
 
 @ex.config
 def cfg():
-    model_name = 'unet'
+    model_name = 'tiramisu'
 
     patch_size = 0
     make_border = 6
@@ -205,10 +207,10 @@ def cfg():
 
     regularization = 0.000001
     learning_rate = 0.001
-    batch_size = 6
+    batch_size = 4
     nb_epochs = 800
 
-    use_dice = True
+    use_dice = False
 
 
 @ex.main
