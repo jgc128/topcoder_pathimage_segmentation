@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-
+import copy
 import os
 import logging
 
@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import torchvision.transforms
 
 from sacred import Experiment
+from scipy.stats import gmean
 from tqdm import tqdm
 
 import config
@@ -21,10 +22,59 @@ from train import create_model, get_checkpoint_filename
 from utils.io import save_pickle
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda, restore_weights
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode, DeterministicPatchesDataset
-import utils.torch.transforms
+from utils.torch.transforms import RandomTranspose, RandomHorizontalFlip, RandomVerticalFlip, MakeBorder, CopyNumpy, \
+    ImageMaskTransformsCompose, MaskToTensor
 from utils.torch.layers import CenterCrop2d
 
 ex = Experiment()
+
+
+def predict_with_transform(model, data_loader, make_border, target_transforms):
+    # save the original transforms to restore later
+    original_transforms = copy.deepcopy(data_loader.dataset.transform.transforms)
+
+    for t in target_transforms:
+        t.apply_always = True
+
+    target_transforms = ImageMaskTransformsCompose(target_transforms)
+
+    data_loader.dataset.transform.transforms.append(target_transforms)
+    data_loader.dataset.transform.transforms.append(CopyNumpy())
+
+    predictions = predict(model, data_loader, make_border)
+    predictions = [target_transforms(p, None)[0] for p in predictions]
+    predictions = np.array(predictions)
+
+    data_loader.dataset.transform.transforms = original_transforms
+
+    return predictions
+
+
+def tta_predict(model, data_loader, make_border):
+    tta_predictions = []
+
+    needed_transforms = [
+        [RandomVerticalFlip(), ],
+        [RandomHorizontalFlip(), ],
+        [RandomVerticalFlip(), RandomHorizontalFlip(), ],
+
+        # [RandomTranspose(), ],
+        # [RandomTranspose(), RandomVerticalFlip(), ],
+        # [RandomTranspose(), RandomHorizontalFlip(), ],
+        # [RandomTranspose(), RandomVerticalFlip(), RandomHorizontalFlip(), ],
+    ]
+
+    # first, no augmentations
+    predictions = predict(model, data_loader, make_border)
+    tta_predictions.append(predictions)
+
+    for target_transform in needed_transforms:
+        predictions = predict_with_transform(model, data_loader, make_border, target_transform)
+        tta_predictions.append(predictions)
+
+    tta_predictions = gmean(tta_predictions, axis=0)
+
+    return tta_predictions
 
 
 def predict(model, data_loader, make_border):
@@ -66,9 +116,9 @@ def create_data_loader(base_dir, mode, nb_folds=5, fold_number=0, batch_size=32,
     transform = []
 
     if make_border != 0:
-        transform.append(utils.torch.transforms.MakeBorder(border_size=make_border))
+        transform.append(MakeBorder(border_size=make_border))
 
-    transform = utils.torch.transforms.ImageMaskTransformsCompose(transform)
+    transform = ImageMaskTransformsCompose(transform)
 
     image_transform = [
         torchvision.transforms.ToTensor(),
@@ -79,7 +129,7 @@ def create_data_loader(base_dir, mode, nb_folds=5, fold_number=0, batch_size=32,
     image_transform = torchvision.transforms.Compose(image_transform)
 
     mask_transform = [
-        utils.torch.transforms.MaskToTensor()
+        MaskToTensor()
     ]
     mask_transform = torchvision.transforms.Compose(mask_transform)
 
@@ -133,7 +183,7 @@ def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predi
 
 @ex.config
 def cfg():
-    model_name = 'tiramisu'
+    model_name = 'unet'
     patch_size_train = 0
     patch_size_predict = 0
     make_border = 6
@@ -174,7 +224,8 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
                                          batch_size=batch_size,
                                          patch_size=patch_size_predict, make_border=make_border, augment=False)
 
-        patches_predictions = predict(model, data_loader, make_border=make_border)
+        # patches_predictions = predict(model, data_loader, make_border=make_border)
+        patches_predictions = tta_predict(model, data_loader, make_border=make_border)
         logging.info(f'Patch predictions: {patches_predictions.shape}')
 
         predictions = combine_patches(patches_predictions, data_loader.dataset.patches,
