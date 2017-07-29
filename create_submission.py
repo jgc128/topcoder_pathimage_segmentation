@@ -52,10 +52,11 @@ def cfg():
     use_dice = False
 
     threshold = 0.3
+    average_mode = 'mean'
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, threshold):
+def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, threshold, average_mode):
     submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice)
 
     configurations = [
@@ -77,9 +78,15 @@ def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, t
             for image, image_pred in zip(images, fold_predictions):
                 predictions[image].append(image_pred)
 
-        # get geometric mean of all folds
+        # get mean of all folds
         images = sorted(predictions.keys())
-        predictions = [gmean(predictions[image]) for image in images]
+        logging.info(f'Average mode: {average_mode}')
+        if average_mode == 'gmean':
+            predictions = [gmean(predictions[image]) for image in images]
+        elif average_mode == 'mean':
+            predictions = [np.mean(predictions[image], axis=0) for image in images]
+        else:
+            ValueError(f'Average mode {average_mode} unknown')
 
         create_submission_files(submission_dir, images, predictions, threshold)
 
