@@ -172,11 +172,12 @@ def save_predictions(filename, images, predictions):
     save_pickle(filename, to_save)
 
 
-def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number, use_dice):
+def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict, fold_number, use_dice, use_tta):
     use_dice = int(use_dice)
+    use_tta = int(use_tta)
     prediction_filename = config.PREDICTIONS_DIR.joinpath(
         'folds/',
-        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_fold{fold_number}_dice{use_dice}_{mode.name.lower()}.pkl'
+        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_fold{fold_number}_dice{use_dice}_tta{use_tta}_{mode.name.lower()}.pkl'
     )
     return prediction_filename
 
@@ -191,12 +192,14 @@ def cfg():
     fold_number = 0
 
     use_dice = False
+    use_tta = False
 
-    batch_size = 2
+    batch_size = 4
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds, fold_number, use_dice, batch_size):
+def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds, fold_number, use_dice, use_tta,
+         batch_size):
     set_variable_repr()
 
     model_params = {
@@ -218,14 +221,20 @@ def main(model_name, patch_size_train, patch_size_predict, make_border, nb_folds
         mode = conf['mode']
         base_dir = conf['base_dir']
         predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
-                                                       fold_number, use_dice)
+                                                       fold_number, use_dice, use_tta)
 
         data_loader = create_data_loader(base_dir=base_dir, mode=mode, nb_folds=nb_folds, fold_number=fold_number,
                                          batch_size=batch_size,
                                          patch_size=patch_size_predict, make_border=make_border, augment=False)
 
         # patches_predictions = predict(model, data_loader, make_border=make_border)
-        patches_predictions = tta_predict(model, data_loader, make_border=make_border)
+        if use_tta:
+            logging.info('TTA predictions')
+            patches_predictions = tta_predict(model, data_loader, make_border=make_border)
+        else:
+            logging.info('predictions')
+            patches_predictions = predict(model, data_loader, make_border=make_border)
+
         logging.info(f'Patch predictions: {patches_predictions.shape}')
 
         predictions = combine_patches(patches_predictions, data_loader.dataset.patches,

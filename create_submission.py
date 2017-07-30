@@ -31,13 +31,14 @@ def create_submission_files(submission_dir, images, predictions, threshold):
     logging.info(f'Submission files created: {submission_dir}, {len(images)}')
 
 
-def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice):
+def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice, use_tta):
     use_dice = int(use_dice)
+    use_tta = int(use_tta)
     threshold = str(threshold).replace('.', '')
 
     submission_dir_name = config.SUBMISSIONS_DIR.joinpath(
         'folds/',
-        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_dice{use_dice}_tr{threshold}'
+        f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}_dice{use_dice}_tta{use_tta}_tr{threshold}'
     )
     return submission_dir_name
 
@@ -50,14 +51,16 @@ def cfg():
 
     nb_folds = 5
     use_dice = False
+    use_tta = True
 
-    threshold = 0.4
+    threshold = 0.3
     average_mode = 'gmean'
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, threshold, average_mode):
-    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice)
+def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, use_tta, threshold, average_mode):
+    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice,
+                                             use_tta)
 
     configurations = [
         {'mode': PathologicalImagesDatasetMode.Val, 'base_dir': config.DATASET_TRAIN_DIR, },
@@ -72,7 +75,7 @@ def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, t
 
         for fold_number in range(nb_folds):
             predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
-                                                           fold_number, use_dice)
+                                                           fold_number, use_dice, use_tta)
             images, fold_predictions = load_pickle(predictions_filename)
 
             for image, image_pred in zip(images, fold_predictions):
