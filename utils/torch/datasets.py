@@ -171,3 +171,45 @@ class DeterministicPatchesDataset(PathologicalImagesDataset):
 
     def __len__(self):
         return self.nb_patches
+
+
+class TransformDataset(torch.utils.data.Dataset):
+    def __init__(self, images, masks=None, transform=None, image_transform=None, mask_transform=None):
+        super(TransformDataset, self).__init__()
+
+        self.images = images
+        self.masks = masks
+
+        self.nb_images = len(self.images)
+
+        self.transform = transform
+        self.image_transform = image_transform
+        self.mask_transform = mask_transform
+
+        logging.info(f'Dataset: {self.nb_images} images')
+
+    def _apply_transforms(self, image, mask):
+        if self.transform is not None:
+            image, mask = self.transform(image, mask)
+
+        if self.image_transform is not None:
+            image = self.image_transform(image)
+
+        if self.mask_transform is not None and isinstance(mask, np.ndarray):
+            mask = self.mask_transform(mask)
+
+        return image, mask
+
+    def __getitem__(self, index):
+        image = self.images[index]
+        if self.masks is not None:
+            mask = self.masks[index]
+        else:
+            mask = 0
+
+        image, mask = self._apply_transforms(image, mask)
+
+        return image, mask
+
+    def __len__(self):
+        return self.nb_images

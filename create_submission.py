@@ -51,8 +51,8 @@ def cfg():
     nb_folds = 5
     use_dice = False
 
-    threshold = 0.3
-    average_mode = 'mean'
+    threshold = 0.4
+    average_mode = 'gmean'
 
 
 @ex.main

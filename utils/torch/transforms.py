@@ -220,3 +220,30 @@ class MaskToTensor():
     def __call__(self, mask):
         mask = torch.from_numpy(mask)
         return mask.float().div(255)
+
+
+class UnSqueezeChannel():
+    def __call__(self, image):
+        if len(image.shape) == 2:
+            image = np.expand_dims(image, -1)
+
+        return image
+
+
+class ToTensor(object):
+    def __init__(self, divide=False, transpose=False):
+        super(ToTensor, self).__init__()
+
+        self.divide = divide
+        self.transpose = transpose
+
+    def __call__(self, mask):
+        if self.transpose:
+            mask = mask.transpose((2, 0, 1))
+
+        mask = torch.from_numpy(mask).float()
+
+        if self.divide:
+            mask = mask.div(255)
+
+        return mask

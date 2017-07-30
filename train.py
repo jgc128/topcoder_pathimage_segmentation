@@ -75,7 +75,7 @@ def create_data_loader(mode, nb_folds=5, fold_number=0, batch_size=32, patch_siz
 
 
 def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epochs, batch_size, make_border, use_dice,
-                regularization, checkpoint_filename, log_filename=None):
+                regularization, checkpoint_filename=None, log_filename=None):
     data_loaders = {
         'train': data_loader_train,
         'val': data_loader_val,
@@ -114,11 +114,13 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
                 masks = torch.autograd.Variable(maybe_to_cuda(masks))
 
                 # zero the parameter gradients
+
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
                 outputs = model(images)
-                outputs = outputs.squeeze()
+                # outputs = outputs.squeeze()
+                outputs = outputs.view(-1, outputs.size(-2), outputs.size(-1))
 
                 if crop_outputs is not None:
                     outputs = crop_outputs(outputs)
@@ -150,7 +152,7 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
             log_str = f'Epoch {epoch} {phase}, ' \
                       f'bce: {epoch_loss_bce:.3f}, dice: {epoch_loss_dice:.3f}, total: {epoch_loss_total:.3f}'
 
-            if phase == 'val' and epoch_loss_total < loss_best:
+            if phase == 'val' and epoch_loss_total < loss_best and checkpoint_filename is not None:
                 torch.save(model.state_dict(), checkpoint_filename)
                 loss_best = epoch_loss_total
 
