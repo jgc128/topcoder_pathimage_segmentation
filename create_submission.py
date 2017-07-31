@@ -29,9 +29,11 @@ def create_submission_files(submission_dir, images, predictions, threshold, morp
         pred_mask[pred > threshold] = 1
 
         if morph_open != 0:
+            logging.info('Opening')
             pred_mask = morph_masks(pred_mask, kernel_size=morph_open, operation='open')
 
         if morph_close != 0:
+            logging.info('Closing')
             pred_mask = morph_masks(pred_mask, kernel_size=morph_close, operation='close')
 
         np.savetxt(pred_filename, np.transpose(pred_mask, (1, 0)), fmt='%d', delimiter='')
@@ -39,12 +41,13 @@ def create_submission_files(submission_dir, images, predictions, threshold, morp
     logging.info(f'Submission files created: {submission_dir}, {len(images)}')
 
 
-def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice, use_tta, morph_open,
+def get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold, use_dice, use_tta, morph_open,
                             morph_close):
     use_dice = int(use_dice)
     use_tta = int(use_tta)
     threshold = str(threshold).replace('.', '')
 
+    model_name = '_'.join(models_names)
     submission_dir_name = config.SUBMISSIONS_DIR.joinpath(
         'folds/',
         f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}'
@@ -55,7 +58,7 @@ def get_submission_dir_name(model_name, patch_size_train, patch_size_predict, th
 
 @ex.config
 def cfg():
-    model_name = 'unet_ds'
+    models_names = ['unet_ds', 'tiramisu', 'unet']
     patch_size_train = 0
     patch_size_predict = 0
 
@@ -70,9 +73,9 @@ def cfg():
 
 
 @ex.main
-def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, use_tta, threshold, average_mode,
+def main(models_names, patch_size_train, patch_size_predict, nb_folds, use_dice, use_tta, threshold, average_mode,
          morph_open, morph_close):
-    submission_dir = get_submission_dir_name(model_name, patch_size_train, patch_size_predict, threshold, use_dice,
+    submission_dir = get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold, use_dice,
                                              use_tta, morph_open, morph_close)
 
     configurations = [
@@ -87,12 +90,13 @@ def main(model_name, patch_size_train, patch_size_predict, nb_folds, use_dice, u
         predictions = defaultdict(list)
 
         for fold_number in range(nb_folds):
-            predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
-                                                           fold_number, use_dice, use_tta)
-            images, fold_predictions = load_pickle(predictions_filename)
+            for model_name in models_names:
+                predictions_filename = get_prediction_filename(model_name, mode, patch_size_train, patch_size_predict,
+                                                               fold_number, use_dice, use_tta)
+                images, fold_predictions = load_pickle(predictions_filename)
 
-            for image, image_pred in zip(images, fold_predictions):
-                predictions[image].append(image_pred)
+                for image, image_pred in zip(images, fold_predictions):
+                    predictions[image].append(image_pred)
 
         # get mean of all folds
         images = sorted(predictions.keys())
