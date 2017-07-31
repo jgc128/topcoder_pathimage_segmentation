@@ -137,3 +137,9 @@ class UNet(torch.nn.Module):
         logits = self.logits(net)
 
         return logits
+
+
+class UNetDeepSmall(UNet):
+    def __init__(self, in_channels, out_channels):
+        super(UNetDeepSmall, self).__init__(in_channels, out_channels,
+                                            filter_base=8, filter_factors=(2, 2, 4, 4, 8, 16), filter_bottom=256)

@@ -184,7 +184,7 @@ def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predi
 
 @ex.config
 def cfg():
-    model_name = 'unet'
+    model_name = 'unet_ds'
     patch_size_train = 0
     patch_size_predict = 0
     make_border = 6
@@ -194,7 +194,7 @@ def cfg():
     use_dice = False
     use_tta = False
 
-    batch_size = 4
+    batch_size = 10
 
 
 @ex.main

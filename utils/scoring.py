@@ -5,7 +5,7 @@ from sklearn.metrics import f1_score
 
 
 def f1_micro_score(y_true, y_pred):
-    score = f1_score(y_true.reshape(-1), y_pred.reshape(-1), average='micro')
+    score = f1_score(y_true.reshape(y_true.shape[0], -1), y_pred.reshape(y_pred.shape[0], -1), average='micro')
     return score
 
 

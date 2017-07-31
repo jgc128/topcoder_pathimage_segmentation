@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import MultiStepLR, ReduceLROnPlateau
 from tqdm import tqdm
 
 import config
-from models import FCN32, UNet, Tiramisu
+from models import FCN32, UNet, Tiramisu, UNetDeepSmall
 from utils.torch.helpers import set_variable_repr, maybe_to_cuda
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
@@ -167,6 +167,8 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
                 append_log_file(log_filename,
                                 f'{epoch}\t{phase}\t{epoch_loss_bce:.3f}\t{epoch_loss_dice:.3f}\t{epoch_loss_total:.3f}')
 
+    torch.save(model.state_dict(), checkpoint_filename + '-final')
+
 
 def create_model(model_name, model_params):
     if model_name == 'fcn':
@@ -175,6 +177,8 @@ def create_model(model_name, model_params):
         model_class = UNet
     elif model_name == 'tiramisu':
         model_class = Tiramisu
+    elif model_name == 'unet_ds':
+        model_class = UNetDeepSmall
     else:
         raise ValueError(f'Unknown model {model_name}')
 
@@ -199,7 +203,7 @@ def get_checkpoint_filename(model_name, patch_size, fold_number, use_dice):
 
 @ex.config
 def cfg():
-    model_name = 'tiramisu'
+    model_name = 'unet_ds'
 
     patch_size = 0
     make_border = 6
