@@ -185,3 +185,10 @@ class Tiramisu(torch.nn.Module):
         logits = self.logits(net)
 
         return logits
+
+
+class TiramisuDeepSmall(Tiramisu):
+    def __init__(self, in_channels, out_channels):
+        super(TiramisuDeepSmall, self).__init__(in_channels, out_channels,
+                                                nb_layers_per_block=(2, 3, 3, 4, 4), growth_rate=6,
+                                                nb_layers_bottleneck=5, nb_filters_initial=48)

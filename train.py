@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+import functools
 import os
 import logging
 
@@ -16,8 +17,8 @@ from torch.optim.lr_scheduler import MultiStepLR, ReduceLROnPlateau
 from tqdm import tqdm
 
 import config
-from models import FCN32, UNet, Tiramisu, UNetDeepSmall
-from utils.torch.helpers import set_variable_repr, maybe_to_cuda
+from models import FCN32, UNet, Tiramisu, UNetDeepSmall, TiramisuDeepSmall
+from utils.torch.helpers import set_variable_repr, maybe_to_cuda, cyclic_lr_scheduler
 from utils.torch.datasets import PathologicalImagesDataset, PathologicalImagesDatasetMode
 import utils.torch.transforms
 from utils.torch.layers import CenterCrop2d
@@ -86,7 +87,9 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularization)
     # lr_scheduler = MultiStepLR(optimizer, milestones=[200, 400, 600], gamma=0.1)
-    lr_scheduler = ReduceLROnPlateau(optimizer, patience=100)
+    # lr_scheduler = ReduceLROnPlateau(optimizer, patience=100)
+    lr_scheduler = functools.partial(cyclic_lr_scheduler, base_lr=learning_rate, max_lr=learning_rate * 6,
+                                     step_size=100)
 
     model = maybe_to_cuda(model)
 
@@ -113,8 +116,11 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
                 images = torch.autograd.Variable(maybe_to_cuda(images))
                 masks = torch.autograd.Variable(maybe_to_cuda(masks))
 
-                # zero the parameter gradients
+                if phase == 'train':
+                    optimizer = lr_scheduler(optimizer, iteration, epoch)
+                    iteration += 1
 
+                # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
@@ -158,8 +164,9 @@ def train_model(model, data_loader_train, data_loader_val, learning_rate, nb_epo
 
                 log_str += ' [model saved]'
 
-            if phase == 'val':
-                lr_scheduler.step(epoch_loss_total)
+            # PyTorch ReduceLROnPlateau
+            # if phase == 'val':
+            #     lr_scheduler.step(epoch_loss_total)
 
             logging.info(log_str)
 
@@ -179,10 +186,16 @@ def create_model(model_name, model_params):
         model_class = Tiramisu
     elif model_name == 'unet_ds':
         model_class = UNetDeepSmall
+    elif model_name == 'unet_ds2':
+        model_class = UNetDeepSmall
+    elif model_name == 'tiramisu_ds':
+        model_class = TiramisuDeepSmall
     else:
         raise ValueError(f'Unknown model {model_name}')
 
     model = model_class(**model_params)
+
+    logging.info(f'Model created: {type(model)}')
 
     return model
 
@@ -203,7 +216,7 @@ def get_checkpoint_filename(model_name, patch_size, fold_number, use_dice):
 
 @ex.config
 def cfg():
-    model_name = 'unet_ds'
+    model_name = 'tiramisu_ds'
 
     patch_size = 0
     make_border = 6
@@ -213,7 +226,7 @@ def cfg():
 
     regularization = 0.000001
     learning_rate = 0.001
-    batch_size = 4
+    batch_size = 6
     nb_epochs = 800
 
     use_dice = False
