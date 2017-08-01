@@ -192,7 +192,7 @@ def cfg():
     fold_number = 0
 
     use_dice = False
-    use_tta = False
+    use_tta = True
 
     batch_size = 10
 
