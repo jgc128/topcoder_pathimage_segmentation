@@ -38,11 +38,11 @@ def cyclic_lr_scheduler(optimizer, iteration, epoch, base_lr=0.001, max_lr=0.006
         base_lr /= 10
         max_lr /= 10
 
-    if epoch > 400:
+    if epoch > 300:
         base_lr /= 10
         max_lr /= 10
 
-    if epoch > 600:
+    if epoch > 350:
         base_lr /= 10
         max_lr /= 10
 

@@ -188,8 +188,12 @@ def create_model(model_name, model_params):
         model_class = UNetDeepSmall
     elif model_name == 'unet_ds2':
         model_class = UNetDeepSmall
+    elif model_name == 'unet_ds_low':
+        model_class = UNetDeepSmall
     elif model_name == 'tiramisu_ds':
         model_class = TiramisuDeepSmall
+    elif model_name == 'unet_low':
+        model_class = UNet
     else:
         raise ValueError(f'Unknown model {model_name}')
 
@@ -216,7 +220,7 @@ def get_checkpoint_filename(model_name, patch_size, fold_number, use_dice):
 
 @ex.config
 def cfg():
-    model_name = 'tiramisu_ds'
+    model_name = 'unet_low'
 
     patch_size = 0
     make_border = 6
@@ -225,9 +229,9 @@ def cfg():
     fold_number = 0
 
     regularization = 0.000001
-    learning_rate = 0.001
-    batch_size = 6
-    nb_epochs = 800
+    learning_rate = 0.0005
+    batch_size = 15
+    nb_epochs = 400
 
     use_dice = False
 
@@ -248,7 +252,7 @@ def main(model_name, patch_size, make_border, nb_folds, fold_number, regularizat
                                            make_border=make_border, augment=True, shuffle=True)
     data_loader_val = create_data_loader(PathologicalImagesDatasetMode.Val, nb_folds=nb_folds, fold_number=fold_number,
                                          batch_size=batch_size, patch_size=patch_size, make_border=make_border,
-                                         augment=True, shuffle=True)
+                                         augment=False, shuffle=True)
 
     checkpoint_filename = get_checkpoint_filename(model_name, patch_size, fold_number, use_dice)
     log_filename = checkpoint_filename.stem + '_training.log'

@@ -184,7 +184,7 @@ def get_prediction_filename(model_name, mode, patch_size_train, patch_size_predi
 
 @ex.config
 def cfg():
-    model_name = 'unet_ds'
+    model_name = 'unet_low'
     patch_size_train = 0
     patch_size_predict = 0
     make_border = 6

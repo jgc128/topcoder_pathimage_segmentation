@@ -20,8 +20,8 @@ from utils.postprocessing import morph_masks
 ex = Experiment()
 
 
-def create_submission_files(submission_dir, images, predictions, threshold, morph_open, morph_close, remove_holes,
-                            remove_objects):
+def create_submission_files(submission_dir, images, predictions, threshold, threshold_auto, morph_open, morph_close,
+                            remove_holes, remove_objects):
     submission_dir.mkdir(exist_ok=True)
 
     for image, pred in zip(images, predictions):
@@ -51,27 +51,28 @@ def create_submission_files(submission_dir, images, predictions, threshold, morp
     logging.info(f'Submission files created: {submission_dir}, {len(images)}')
 
 
-def get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold, use_dice, use_tta,
-                            morph_open,
-                            morph_close, remove_holes, remove_objects):
+def get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold, threshold_auto, use_dice,
+                            use_tta, morph_open, morph_close, remove_holes, remove_objects, average_mode):
     use_dice = int(use_dice)
     use_tta = int(use_tta)
+    threshold_auto = int(threshold_auto)
     threshold = str(threshold).replace('.', '')
 
     model_name = '_'.join(models_names)
     submission_dir_name = config.SUBMISSIONS_DIR.joinpath(
         'folds/',
         f'{model_name}_patch{patch_size_train}_predict{patch_size_predict}'
-        f'_dice{use_dice}_tta{use_tta}_tr{threshold}'
+        f'_dice{use_dice}_tta{use_tta}_tr{threshold}auto{threshold_auto}'
         f'_open{morph_open}_close{morph_close}'
         f'_holes{remove_holes}_objects{remove_objects}'
+        f'_avg{average_mode}'
     )
     return submission_dir_name
 
 
 @ex.config
 def cfg():
-    models_names = ['unet_ds', 'unet']
+    models_names = ['unet', 'unet_ds']
     patch_size_train = 0
     patch_size_predict = 0
 
@@ -79,19 +80,22 @@ def cfg():
     use_dice = False
     use_tta = False
 
-    threshold = 0.3
+    threshold = 0.4
+    threshold_auto = True
     average_mode = 'gmean'
     morph_open = 0
     morph_close = 0
-    remove_holes = 40
-    remove_objects = 40
+    remove_holes = 5
+    remove_objects = 5
 
 
 @ex.main
-def main(models_names, patch_size_train, patch_size_predict, nb_folds, use_dice, use_tta, threshold, average_mode,
-         morph_open, morph_close, remove_holes, remove_objects):
-    submission_dir = get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold, use_dice,
-                                             use_tta, morph_open, morph_close, remove_holes, remove_objects)
+def main(models_names, patch_size_train, patch_size_predict, nb_folds, use_dice, use_tta, threshold, threshold_auto,
+         average_mode, morph_open, morph_close, remove_holes, remove_objects):
+    submission_dir = get_submission_dir_name(models_names, patch_size_train, patch_size_predict, threshold,
+                                             threshold_auto, use_dice,
+                                             use_tta, morph_open, morph_close, remove_holes, remove_objects,
+                                             average_mode)
 
     configurations = [
         {'mode': PathologicalImagesDatasetMode.Val, 'base_dir': config.DATASET_TRAIN_DIR, },
@@ -123,8 +127,8 @@ def main(models_names, patch_size_train, patch_size_predict, nb_folds, use_dice,
         else:
             ValueError(f'Average mode {average_mode} unknown')
 
-        create_submission_files(submission_dir, images, predictions, threshold, morph_open, morph_close, remove_holes,
-                                remove_objects)
+        create_submission_files(submission_dir, images, predictions, threshold, threshold_auto, morph_open, morph_close,
+                                remove_holes, remove_objects)
 
     # create archive
     submission_filename = shutil.make_archive(submission_dir, 'zip', submission_dir)
